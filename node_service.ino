@@ -1,12 +1,13 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ArduinoJson.h>
 
 // WiFi config
 const char wifissid[] = "INFINITUM17D5A5";
 const char wifipsk[] = "F15850E73F";
 
 // OUTPUT Definitions
-const int OUTPUT_PIN = 16;  // D0
+const int OUTPUT_PIN = 16; // D0
 
 WiFiServer server(80);
 
@@ -14,7 +15,7 @@ void setup()
 {
     initHardWare();
     connectWiFi();
-    server.begin();         // Server instance in port 80
+    server.begin(); // Server instance in port 80
     setupMDNS();
 }
 
@@ -22,8 +23,7 @@ void loop()
 {
     WiFiClient client = server.available();
 
-    char statusSystem[] =
-        "{\"system\":\"ready\"}";
+    char statusSystem[] = "{\"system\":\"ready\"}";
 
     if (!client)
     {
@@ -34,9 +34,11 @@ void loop()
     Serial.println(request);
 
     String header = "HTTP/1.1 200 OK\r\n";
+    header += "Access-Control-Allow-Methods: POST,GET,OPTIONS\r\n";
+    header += "Access-Control-Max-Age: 10000\r\n";
+    header += "Access-Control-Allow-Origin: *\r\n";
+    header += "Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept\r\n";
     header += "Content-Type: application/json\r\n\r\n";
-
-    String systemInfo = "";
 
     int alarmStatus = -1;
 
@@ -48,33 +50,20 @@ void loop()
     if (request.indexOf("/alarm/1") != -1)
     {
         alarmStatus = 1;
+        client.print(header);
+        client.print("{\"alarm\":\"on\"}");
     }
     if (request.indexOf("/alarm/0") != -1)
     {
         alarmStatus = 0;
+        client.print(header);
+        client.print("{\"alarm\":\"off\"}");
     }
 
-    if (alarmStatus >= 0)
-    {
-        digitalWrite(OUTPUT_PIN, alarmStatus);
-        systemInfo = outputStatus(alarmStatus);
-    }
-
-    client.print(header);
-    client.print(systemInfo);
+    digitalWrite(OUTPUT_PIN, alarmStatus);
 
     client.flush();
     delay(1);
-}
-
-String outputStatus(int alarmSt)
-{
-    String response;
-    if (alarmSt >= 0)
-    {
-        response = (alarmSt) ? "{\"alarm\":\"on\"}" : "{\"alarm\":\"off\"}";
-    }
-    return response;
 }
 
 // # Setup Region
@@ -120,6 +109,8 @@ void initHardWare()
     Serial.begin(115200);
 
     pinMode(OUTPUT_PIN, OUTPUT);
+
+    StaticJsonDocument<200> doc;
 
     digitalWrite(OUTPUT_PIN, LOW);
 }
